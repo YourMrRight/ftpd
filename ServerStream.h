@@ -1,3 +1,13 @@
+/**
+ * @file ServerStream.h
+ * @author zhangshixin (zhangshixin@scutech.com)
+ * @brief 定义一个客户端与服务器端的通道，当客户端与服务器发生连接则实例化该通道用于传输控制命令
+ * @version 0.1
+ * @date 2022-09-06
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
 #ifndef SERVERSTREAM_H_
 #define SERVERSTREAM_H_
 #pragma once

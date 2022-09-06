@@ -10,9 +10,9 @@
  */
 
 #include "Server.h"
-#include "ServerStream.cpp"
-#include "User.cpp"
-#include "FtpMsg.h"
+#include "Server_Stream.h"
+#include "User.h"
+#include "Ftp_Msg.h"
 
 #include <ace/OS.h>
 #include <ace/Task.h>
@@ -21,40 +21,28 @@
 #define FILE_DATA_BLOCK 1024
 #define REC_BLOCK 2048
 #define THREAD_NUM 10
-//class user;
-typedef ACE_Singleton<TaskThread,ACE_Thread_Mutex> TaskThreadPool;
-list<ServerStream*>g_StreamPool;
 
-Server::Server(int port,char* ip): m_Svr_addr(port,ip)
+typedef ACE_Singleton<Task_Thread,ACE_Thread_Mutex> TaskThreadPool;
+
+list<Server_Stream*>g_stream_pool;
+
+Server::Server(int port,char* ip)
+    : m_Svr_addr(port,ip)
 {
-    if (!open())    //open listen port
-    {
-        ACE_DEBUG((LM_INFO, ACE_TEXT("open failed!\n")));
-    } else
-    {
-        ACE_DEBUG((LM_INFO, ACE_TEXT("open success!\n")));
-        TaskThreadPool::instance()->activate(THR_NEW_LWP | THR_JOINABLE |THR_INHERIT_SCHED , THREAD_NUM);//创建10个线程处理业务
-    }
+
 }
 
 Server::~Server()
 {
     close();
-    std::list<ServerStream*>::iterator it;
-    for (it = g_StreamPool.begin();it != g_StreamPool.end();++it)
-    {
-        if (NULL != (*it))
-        {
-            (*it)->close();
-            delete (*it);
-        }
+    for (auto i : g_stream_pool) {
+        i->close();
     }
 }
 
 bool Server::open()
 {
-    if (-1 == m_Svr_accept.open(m_Svr_addr,1))
-    {
+    if (m_Svr_accept.open(m_Svr_addr, 1) == -1) {
         ACE_DEBUG((LM_ERROR,ACE_TEXT("failed to accept\n")));
         m_Svr_accept.close();
         return false;
@@ -75,18 +63,29 @@ ACE_HANDLE Server::get_handle(void) const
 
 int Server::handle_input(ACE_HANDLE handle)
 {
-    ServerStream *stream = new ServerStream(TaskThreadPool::instance());    //产生新通道
-    if (NULL != stream)
-    {
-        g_StreamPool.push_back(stream);//暂时存储全局变量用于内存管理,优化可增加一个连接管理类管理连接通道
-    }
-    if (m_Svr_accept.accept(stream->get_stream()) == -1)  //绑定通道
-    {  
+    Server_Stream *stream = new Server_Stream(TaskThreadPool::instance());    //产生新通道
+    if (m_Svr_accept.accept(stream->get_stream()) == -1) {  
         printf("accept client fail\n");  
+        delete stream;
         return -1;  
     }
-    ACE_Reactor::instance()->register_handler(stream,ACE_Event_Handler::READ_MASK);  //通道注册到ACE_Reactor
+    if (!stream) {
+        g_stream_pool.push_back(stream);//暂时存储全局变量用于内存管理,优化可增加一个连接管理类管理连接通道
+        stream_pool.push_back(stream);
+    }
+
+    ACE_Reactor::instance()->register_handler(stream, ACE_Event_Handler::READ_MASK);  //通道注册到ACE_Reactor
     stream->get_stream().send(ESTABLISH,ACE_OS::strlen(ESTABLISH));
-    ACE_DEBUG((LM_INFO,"User connect success!,ClientPool num = %d\n",g_StreamPool.size()));
+    ACE_DEBUG((LM_INFO, "User connect success! ClientPool num = %d\n", g_stream_pool.size()));
     return 0; 
+}
+
+void Server::init()
+{
+    if (!open()) {
+        ACE_DEBUG((LM_INFO, "open failed!\n"));
+    } else {
+        ACE_DEBUG((LM_INFO, "open success!\n"));
+        TaskThreadPool::instance()->activate(THR_NEW_LWP | THR_JOINABLE |THR_INHERIT_SCHED , THREAD_NUM);//创建10个线程处理业务
+    }
 }

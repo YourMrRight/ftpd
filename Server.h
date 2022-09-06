@@ -1,8 +1,7 @@
-#ifndef SERVER_H_
-#define SERVER_H_
-#pragma once
+#ifndef __SERVER_H__
+#define __SERVER_H__
 
-#include "ServerStream.h"
+#include "Server_Stream.h"
 
 #include <ace/Log_Msg.h>
 #include <ace/SOCK_Stream.h>
@@ -14,14 +13,12 @@
 #include <map>
 #include <list>
 
-using namespace std;
-
 class Server: public ACE_Event_Handler
 {
 private:
-    /* data */
     ACE_INET_Addr m_Svr_addr;
     ACE_SOCK_Acceptor m_Svr_accept;
+    list<Server_Stream *> stream_pool;
 public:
     Server(int port,char* ip);
     virtual ~Server();
@@ -29,8 +26,8 @@ public:
     void close();
     virtual ACE_HANDLE get_handle(void)const override;
     virtual int handle_input(ACE_HANDLE handle)override;
-    //virtual int handle_signal(ACE_HANDLE handle, ACE_Reactor_Mask close_mask);
+    void init();
 };
 
 
-#endif
+#endif // __SERVER_H__
